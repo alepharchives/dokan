@@ -1,0 +1,33 @@
+
+
+386_OBJECTS=\
+ $(OBJ_PATH)\$O\dokan.obj \
+ $(OBJ_PATH)\$O\write.obj \
+ $(OBJ_PATH)\$O\directory.obj \
+ $(OBJ_PATH)\$O\fileinfo.obj \
+ $(OBJ_PATH)\$O\setfile.obj \
+ $(OBJ_PATH)\$O\volume.obj \
+ $(OBJ_PATH)\$O\mount.obj \
+ $(OBJ_PATH)\$O\version.obj \
+ $(OBJ_PATH)\$O\close.obj \
+ $(OBJ_PATH)\$O\lock.obj \
+ $(OBJ_PATH)\$O\flush.obj \
+ $(OBJ_PATH)\$O\cleanup.obj \
+ $(OBJ_PATH)\$O\create.obj \
+ $(OBJ_PATH)\$O\read.obj \
+ $(OBJ_PATH)\$O\status.obj \
+ $(OBJ_PATH)\$O\timeout.obj \
+ $(OBJ_PATH)\$O\security.obj \
+ $(OBJ_PATH)\$O\access.obj \
+
+
+
+
+
+# lowercased
+BASEDIR=g:\winddk\7600.16385.1
+OBJECT_ROOT=g:\winddk\7600.16385.1
+MAKEDIR_LOWERCASE=g:\dokan-fork\dokan
+OBJ_PATH=g:\dokan-fork\dokan
+CONCURRENT_MIDL=0
+CONCURRENT_MANIFEST_BUILD=0

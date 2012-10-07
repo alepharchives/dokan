@@ -50,6 +50,8 @@ extern "C" {
 #define DOKAN_OPTION_NETWORK	16 // use network drive, you need to install Dokan network provider.
 #define DOKAN_OPTION_REMOVABLE	32 // use removable drive
 
+#define DOKAN_OPTION_LOCAL      2048 //make drive visible only to local user
+
 typedef struct _DOKAN_OPTIONS {
 	USHORT	Version; // Supported Dokan Version, ex. "530" (Dokan ver 0.5.3)
 	USHORT	ThreadCount; // number of threads to be used
@@ -266,6 +268,10 @@ typedef struct _DOKAN_OPERATIONS {
 		PSECURITY_INFORMATION,
 		PSECURITY_DESCRIPTOR, // SecurityDescriptor
 		ULONG, // SecurityDescriptor length
+		PDOKAN_FILE_INFO);
+
+	//NEW:Called immediately after filesystem is mounted NOTE: PDOKAN_FILE_INFO will be NULL 
+	int (DOKAN_CALLBACK *Mount) (
 		PDOKAN_FILE_INFO);
 
 

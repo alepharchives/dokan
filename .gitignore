@@ -1,0 +1,6 @@
+# ignore build logs
+*.log
+# ignore build dirs
+objchk*
+bin*
+

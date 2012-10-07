@@ -93,7 +93,7 @@ DokanLoop(
 BOOL
 DokanMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName);
+	LPCWSTR	DeviceName,ULONG Options);
 
 VOID
 SendEventInformation(

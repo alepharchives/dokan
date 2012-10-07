@@ -25,6 +25,7 @@ THE SOFTWARE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <sddl.h>
+#include "C:\Program Files\Microsoft SDKs\Windows\v7.0A\Include\WtsApi32.h" 
 #include "mount.h"
 #include "public.h"
 
@@ -41,7 +42,7 @@ BOOL g_DebugMode = TRUE;
 BOOL g_UseStdErr = FALSE;
 
 PMOUNT_ENTRY
-InsertMountEntry(PDOKAN_CONTROL DokanControl)
+	InsertMountEntry(PDOKAN_CONTROL DokanControl)
 {
 	PMOUNT_ENTRY	mountEntry;
 	mountEntry = malloc(sizeof(MOUNT_ENTRY));
@@ -61,7 +62,7 @@ InsertMountEntry(PDOKAN_CONTROL DokanControl)
 }
 
 VOID
-RemoveMountEntry(PMOUNT_ENTRY MountEntry)
+	RemoveMountEntry(PMOUNT_ENTRY MountEntry)
 {
 	EnterCriticalSection(&g_CriticalSection);
 	RemoveEntryList(&MountEntry->ListEntry);
@@ -71,7 +72,7 @@ RemoveMountEntry(PMOUNT_ENTRY MountEntry)
 }
 
 PMOUNT_ENTRY
-FindMountEntry(PDOKAN_CONTROL	DokanControl)
+	FindMountEntry(PDOKAN_CONTROL	DokanControl)
 {
 	PLIST_ENTRY		listEntry;
 	PMOUNT_ENTRY	mountEntry;
@@ -84,10 +85,10 @@ FindMountEntry(PDOKAN_CONTROL	DokanControl)
 
 	EnterCriticalSection(&g_CriticalSection);
 
-    for (listEntry = g_MountList.Flink; listEntry != &g_MountList; listEntry = listEntry->Flink) {
+	for (listEntry = g_MountList.Flink; listEntry != &g_MountList; listEntry = listEntry->Flink) {
 		mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
 		if (useMountPoint) {
-			if (wcscmp(DokanControl->MountPoint, mountEntry->MountControl.MountPoint) == 0) {
+			if (wcscmp(DokanControl->MountPoint, mountEntry->MountControl.MountPoint) == 0&&DokanControl->SessionId==mountEntry->MountControl.SessionId) {
 				found = TRUE;
 				break;
 			}
@@ -111,7 +112,7 @@ FindMountEntry(PDOKAN_CONTROL	DokanControl)
 }
 
 VOID
-DokanControlFind(PDOKAN_CONTROL Control)
+	DokanControlFind(PDOKAN_CONTROL Control)
 {
 	PLIST_ENTRY		listEntry;
 	PMOUNT_ENTRY	mountEntry;
@@ -121,15 +122,15 @@ DokanControlFind(PDOKAN_CONTROL Control)
 		Control->Status = DOKAN_CONTROL_FAIL;
 	} else {
 		wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-				mountEntry->MountControl.DeviceName);
+			mountEntry->MountControl.DeviceName);
 		wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
-				mountEntry->MountControl.MountPoint);
+			mountEntry->MountControl.MountPoint);
 		Control->Status = DOKAN_CONTROL_SUCCESS;
 	}
 }
 
 VOID
-DokanControlList(PDOKAN_CONTROL Control)
+	DokanControlList(PDOKAN_CONTROL Control)
 {
 	PLIST_ENTRY		listEntry;
 	PMOUNT_ENTRY	mountEntry;
@@ -141,24 +142,47 @@ DokanControlList(PDOKAN_CONTROL Control)
 	for (listEntry = g_MountList.Flink;
 		listEntry != &g_MountList;
 		listEntry = listEntry->Flink) {
-		mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
-		if (Control->Option == index++) {
-			wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
+			mountEntry = CONTAINING_RECORD(listEntry, MOUNT_ENTRY, ListEntry);
+			if (Control->Option == index++) {
+				wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
 					mountEntry->MountControl.DeviceName);
-			wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
+				wcscpy_s(Control->MountPoint, sizeof(Control->MountPoint) / sizeof(WCHAR),
 					mountEntry->MountControl.MountPoint);
-			Control->Status = DOKAN_CONTROL_SUCCESS;
-			break;
-		}
+				Control->Status = DOKAN_CONTROL_SUCCESS;
+				break;
+			}
 	}
 	LeaveCriticalSection(&g_CriticalSection);
 }
+
+static BOOL ImpersonateUserBySession(DWORD dwSessionId,PHANDLE phToken){
+
+	DbgPrintW(L"WTSQueryUserToken:%d\n",dwSessionId);
+
+	if(!WTSQueryUserToken(dwSessionId,phToken)){
+
+		DbgPrintW(L"WTSQueryUserToken for session %d failed:%d\n", dwSessionId, GetLastError());
+
+		return FALSE;
+	}
+
+	if(!ImpersonateLoggedOnUser(*phToken)){
+
+		DbgPrintW(L"ImpersonateLoggedOnUser for token %d failed:%d\n", *phToken, GetLastError());
+		CloseHandle(*phToken);
+		return FALSE;
+	}
+
+	return TRUE;
+
+}
+
+
 static VOID DokanControl(PDOKAN_CONTROL Control)
 {
 	PMOUNT_ENTRY	mountEntry;
-	ULONG	index = 0;
-	DWORD written = 0;
-
+	BOOL impersonate;
+	HANDLE token;
 	Control->Status = DOKAN_CONTROL_FAIL;
 
 	switch (Control->Type)
@@ -167,11 +191,23 @@ static VOID DokanControl(PDOKAN_CONTROL Control)
 
 		DbgPrintW(L"DokanControl Mount\n");
 
+		impersonate=Control->Option & DOKAN_CONTROL_OPTION_LOCAL_CONTEXT;
+
+		if(impersonate){
+			if(!ImpersonateUserBySession(Control->SessionId,&token))
+				break;
+		}
+
 		if (DokanControlMount(Control->MountPoint, Control->DeviceName)) {
 			Control->Status = DOKAN_CONTROL_SUCCESS;
 			InsertMountEntry(Control);
 		} else {
 			Control->Status = DOKAN_CONTROL_FAIL;
+		}
+
+		if(impersonate){
+			RevertToSelf();
+			CloseHandle(token);
 		}
 		break;
 
@@ -180,26 +216,38 @@ static VOID DokanControl(PDOKAN_CONTROL Control)
 		DbgPrintW(L"DokanControl Unmount\n");
 
 		mountEntry = FindMountEntry(Control);
-		if (mountEntry == NULL) {
+		if (mountEntry == NULL) {//TODO: What to do in this case: treat it as global or as local mount?
 			if (Control->Option == DOKAN_CONTROL_OPTION_FORCE_UNMOUNT &&
 				DokanControlUnmount(Control->MountPoint)) {
-				Control->Status = DOKAN_CONTROL_SUCCESS;
-				break;
+					Control->Status = DOKAN_CONTROL_SUCCESS;
+					break;
 			}
 			Control->Status = DOKAN_CONTROL_FAIL;
 			break;	
+		}
+
+		impersonate=mountEntry->MountControl.Option & DOKAN_CONTROL_OPTION_LOCAL_CONTEXT;
+
+		if(impersonate){
+			if(!ImpersonateUserBySession(Control->SessionId,&token))
+				break;
 		}
 
 		if (DokanControlUnmount(mountEntry->MountControl.MountPoint)) {
 			Control->Status = DOKAN_CONTROL_SUCCESS;
 			if (wcslen(Control->DeviceName) == 0) {
 				wcscpy_s(Control->DeviceName, sizeof(Control->DeviceName) / sizeof(WCHAR),
-						mountEntry->MountControl.DeviceName);
+					mountEntry->MountControl.DeviceName);
 			}
 			RemoveMountEntry(mountEntry);
 		} else {
 			mountEntry->MountControl.Status = DOKAN_CONTROL_FAIL;
 			Control->Status = DOKAN_CONTROL_FAIL;
+		}
+
+		if(impersonate){
+			RevertToSelf();
+			CloseHandle(token);
 		}
 
 		break;
@@ -247,7 +295,7 @@ static DWORD WINAPI HandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEvent
 		SetEvent(g_EventControl);
 
 		break;
-	
+
 	case SERVICE_CONTROL_INTERROGATE:
 		SetServiceStatus(g_StatusHandle, &g_ServiceStatus);
 		break;
@@ -265,7 +313,7 @@ static VOID BuildSecurityAttributes(PSECURITY_ATTRIBUTES SecurityAttributes)
 	LPTSTR sd = L"D:P(A;;GA;;;SY)(A;;GRGWGX;;;BA)(A;;GRGW;;;WD)(A;;GR;;;RC)";
 
 	ZeroMemory(SecurityAttributes, sizeof(SECURITY_ATTRIBUTES));
-	
+
 	ConvertStringSecurityDescriptorToSecurityDescriptor(
 		sd,
 		SDDL_REVISION_1,
@@ -273,7 +321,7 @@ static VOID BuildSecurityAttributes(PSECURITY_ATTRIBUTES SecurityAttributes)
 		NULL);
 
 	SecurityAttributes->nLength = sizeof(SECURITY_ATTRIBUTES);
-    SecurityAttributes->bInheritHandle = TRUE;
+	SecurityAttributes->bInheritHandle = TRUE;
 }
 
 
@@ -294,7 +342,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 #else
 	InitializeCriticalSectionAndSpinCount(&g_CriticalSection, 0x80000400);
 #endif
-			
+
 	InitializeListHead(&g_MountList);
 
 	g_StatusHandle = RegisterServiceCtrlHandlerEx(L"DokanMounter", HandlerEx, NULL);
@@ -322,15 +370,15 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 	}
 
 	device = CreateFile(
-				DOKAN_GLOBAL_DEVICE_NAME,			// lpFileName
-				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
-				FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
-				NULL,                               // lpSecurityAttributes
-				OPEN_EXISTING,                      // dwCreationDistribution
-				FILE_FLAG_OVERLAPPED,               // dwFlagsAndAttributes
-				NULL                                // hTemplateFile
-			);
-	
+		DOKAN_GLOBAL_DEVICE_NAME,			// lpFileName
+		GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
+		FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
+		NULL,                               // lpSecurityAttributes
+		OPEN_EXISTING,                      // dwCreationDistribution
+		FILE_FLAG_OVERLAPPED,               // dwFlagsAndAttributes
+		NULL                                // hTemplateFile
+		);
+
 	if (device == INVALID_HANDLE_VALUE) {
 		// TODO: should do something
 		DbgPrintW(L"DokanMounter: failed to open device: %d\n", GetLastError());
@@ -356,10 +404,10 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 		ConnectNamedPipe(pipe, &ov);
 		if (!DeviceIoControl(device, IOCTL_SERVICE_WAIT, NULL, 0,
 			&eventContext, sizeof(EVENT_CONTEXT), NULL, &driver)) {
-			DWORD error = GetLastError();
-			if (error != 997) {
-				DbgPrintW(L"DokanMounter: DeviceIoControl error: %d\n", error);
-			}
+				DWORD error = GetLastError();
+				if (error != 997) {
+					DbgPrintW(L"DokanMounter: DeviceIoControl error: %d\n", error);
+				}
 		}
 
 		eventArray[0] = eventConnect;
@@ -381,7 +429,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 			}
 			FlushFileBuffers(pipe);
 			DisconnectNamedPipe(pipe);
-		
+
 		} else if (eventNo == 1) {
 
 			if (GetOverlappedResult(device, &driver, &returnedBytes, FALSE)) {
@@ -391,7 +439,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 					ZeroMemory(&unmount, sizeof(DOKAN_CONTROL));
 					unmount.Type = DOKAN_CONTROL_UNMOUNT;
 					wcscpy_s(unmount.DeviceName, sizeof(unmount.DeviceName) / sizeof(WCHAR),
-							eventContext.Unmount.DeviceName);
+						eventContext.Unmount.DeviceName);
 					DokanControl(&unmount);
 				} else {
 					DbgPrintW(L"DokanMounter: Unmount error\n", control.Type);
@@ -428,7 +476,7 @@ static VOID WINAPI ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv)
 int WINAPI WinMain(HINSTANCE hinst, HINSTANCE hinstPrev, LPSTR lpszCmdLine, int nCmdShow)
 {
 	SERVICE_TABLE_ENTRY serviceTable[] = {
-		{L"DokanMounter", ServiceMain}, {NULL, NULL}
+		{DOKAN_MOUNTER_SERVICE, ServiceMain}, {NULL, NULL}
 	};
 
 

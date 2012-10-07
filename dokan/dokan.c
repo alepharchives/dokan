@@ -1,9 +1,9 @@
 /*
-  Dokan : user-mode file system library for Windows
+Dokan : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
+Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
 
-  http://dokan-dev.net/en
+http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -45,7 +45,7 @@ CRITICAL_SECTION	g_InstanceCriticalSection;
 LIST_ENTRY			g_InstanceList;	
 
 PDOKAN_INSTANCE 
-NewDokanInstance()
+	NewDokanInstance()
 {
 	PDOKAN_INSTANCE instance = (PDOKAN_INSTANCE)malloc(sizeof(DOKAN_INSTANCE));
 	ZeroMemory(instance, sizeof(DOKAN_INSTANCE));
@@ -67,7 +67,7 @@ NewDokanInstance()
 }
 
 VOID 
-DeleteDokanInstance(PDOKAN_INSTANCE Instance)
+	DeleteDokanInstance(PDOKAN_INSTANCE Instance)
 {
 	DeleteCriticalSection(&Instance->CriticalSection);
 
@@ -79,32 +79,32 @@ DeleteDokanInstance(PDOKAN_INSTANCE Instance)
 }
 
 BOOL
-IsValidDriveLetter(WCHAR DriveLetter)
+	IsValidDriveLetter(WCHAR DriveLetter)
 {
 	return (L'd' <= DriveLetter && DriveLetter <= L'z') ||
 		(L'D' <= DriveLetter && DriveLetter <= L'Z');
 }
 
 int
-CheckMountPoint(LPCWSTR	MountPoint)
+	CheckMountPoint(LPCWSTR	MountPoint)
 {
 	ULONG	length = wcslen(MountPoint);
 
 	if ((length == 1) ||
 		(length == 2 && MountPoint[1] == L':') ||
 		(length == 3 && MountPoint[1] == L':' && MountPoint[2] == L'\\')) {
-		WCHAR driveLetter = MountPoint[0];
-		
-		if (IsValidDriveLetter(driveLetter)) {
-			return DOKAN_SUCCESS;
-		} else {
-			DokanDbgPrintW(L"Dokan Error: bad drive letter %s\n", MountPoint);
-			return DOKAN_DRIVE_LETTER_ERROR;
-		}
+			WCHAR driveLetter = MountPoint[0];
+
+			if (IsValidDriveLetter(driveLetter)) {
+				return DOKAN_SUCCESS;
+			} else {
+				DokanDbgPrintW(L"Dokan Error: bad drive letter %s\n", MountPoint);
+				return DOKAN_DRIVE_LETTER_ERROR;
+			}
 	} else if (length > 3) {
 		HANDLE handle = CreateFile(
-						MountPoint, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
-						FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
+			MountPoint, GENERIC_WRITE, 0, NULL, OPEN_EXISTING,
+			FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			DokanDbgPrintW(L"Dokan Error: bad mount point %s\n", MountPoint);
 			return DOKAN_MOUNT_POINT_ERROR;
@@ -116,7 +116,7 @@ CheckMountPoint(LPCWSTR	MountPoint)
 }
 
 int DOKANAPI
-DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
+	DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
 {
 	ULONG	threadNum = 0;
 	ULONG	i;
@@ -154,11 +154,11 @@ DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
 
 	if (DOKAN_MOUNT_POINT_SUPPORTED_VERSION <= DokanOptions->Version &&
 		DokanOptions->MountPoint) {
-		error = CheckMountPoint(DokanOptions->MountPoint);
-		if (error != DOKAN_SUCCESS) {
-			return error;
-		}
-		useMountPoint = TRUE;
+			error = CheckMountPoint(DokanOptions->MountPoint);
+			if (error != DOKAN_SUCCESS) {
+				return error;
+			}
+			useMountPoint = TRUE;
 	} else if (!IsValidDriveLetter((WCHAR)DokanOptions->Version)) {
 		// Older versions use the first 2 bytes of DokanOptions struct as DriveLetter.
 		DokanDbgPrintW(L"Dokan Error: bad drive letter %wc\n", (WCHAR)DokanOptions->Version);
@@ -166,14 +166,14 @@ DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
 	}
 
 	device = CreateFile(
-					DOKAN_GLOBAL_DEVICE_NAME,			// lpFileName
-					GENERIC_READ|GENERIC_WRITE,			// dwDesiredAccess
-					FILE_SHARE_READ|FILE_SHARE_WRITE,	// dwShareMode
-					NULL,								// lpSecurityAttributes
-					OPEN_EXISTING,						// dwCreationDistribution
-					0,									// dwFlagsAndAttributes
-					NULL								// hTemplateFile
-                    );
+		DOKAN_GLOBAL_DEVICE_NAME,			// lpFileName
+		GENERIC_READ|GENERIC_WRITE,			// dwDesiredAccess
+		FILE_SHARE_READ|FILE_SHARE_WRITE,	// dwShareMode
+		NULL,								// lpSecurityAttributes
+		OPEN_EXISTING,						// dwCreationDistribution
+		0,									// dwFlagsAndAttributes
+		NULL								// hTemplateFile
+		);
 
 	if (device == INVALID_HANDLE_VALUE){
 		DokanDbgPrintW(L"Dokan Error: CreatFile Failed %s: %d\n", 
@@ -188,7 +188,7 @@ DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
 	instance->DokanOperations = DokanOperations;
 	if (useMountPoint) {
 		wcscpy_s(instance->MountPoint, sizeof(instance->MountPoint) / sizeof(WCHAR),
-				DokanOptions->MountPoint);
+			DokanOptions->MountPoint);
 	} else {
 		// Older versions use the first 2 bytes of DokanOptions struct as DriveLetter.
 		instance->MountPoint[0] = (WCHAR)DokanOptions->Version;
@@ -200,7 +200,12 @@ DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
 		return DOKAN_START_ERROR;
 	}
 
-	if (!DokanMount(instance->MountPoint, instance->DeviceName)) {
+	if (DokanMount(instance->MountPoint, instance->DeviceName,DokanOptions->Options)) {
+		if(DOKAN_MOUNT_CALLBACK_SUPPORTED_VERSION <= DokanOptions->Version)
+			DokanOperations->Mount(NULL);
+
+	}else{
+
 		SendReleaseIRP(instance->DeviceName);
 		DokanDbgPrint("Dokan Error: DefineDosDevice Failed\n");
 		return DOKAN_MOUNT_ERROR;
@@ -236,19 +241,19 @@ DokanMain(PDOKAN_OPTIONS DokanOptions, PDOKAN_OPERATIONS DokanOperations)
 		CloseHandle(threadIds[i]);
 	}
 
-    CloseHandle(device);
+	CloseHandle(device);
 
 	Sleep(1000);
-	
+
 	DbgPrint("\nunload\n");
 
 	DeleteDokanInstance(instance);
 
-    return DOKAN_SUCCESS;
+	return DOKAN_SUCCESS;
 }
 
 LPCWSTR
-GetRawDeviceName(LPCWSTR	DeviceName)
+	GetRawDeviceName(LPCWSTR	DeviceName)
 {
 	static WCHAR rawDeviceName[MAX_PATH];
 	wcscpy_s(rawDeviceName, MAX_PATH, L"\\\\.");
@@ -257,8 +262,8 @@ GetRawDeviceName(LPCWSTR	DeviceName)
 }
 
 DWORD WINAPI
-DokanLoop(
-   PDOKAN_INSTANCE DokanInstance
+	DokanLoop(
+	PDOKAN_INSTANCE DokanInstance
 	)
 {
 	HANDLE	device;
@@ -271,14 +276,14 @@ DokanLoop(
 	RtlZeroMemory(buffer, sizeof(buffer));
 
 	device = CreateFile(
-				GetRawDeviceName(DokanInstance->DeviceName), // lpFileName
-				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
-				FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
-				NULL,                               // lpSecurityAttributes
-				OPEN_EXISTING,                      // dwCreationDistribution
-				0,                                  // dwFlagsAndAttributes
-				NULL                                // hTemplateFile
-			);
+		GetRawDeviceName(DokanInstance->DeviceName), // lpFileName
+		GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
+		FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
+		NULL,                               // lpSecurityAttributes
+		OPEN_EXISTING,                      // dwCreationDistribution
+		0,                                  // dwFlagsAndAttributes
+		NULL                                // hTemplateFile
+		);
 
 	if (device == INVALID_HANDLE_VALUE) {
 		DbgPrint("Dokan Error: CreateFile failed %ws: %d\n",
@@ -291,15 +296,15 @@ DokanLoop(
 	while(1) {
 
 		status = DeviceIoControl(
-					device,				// Handle to device
-					IOCTL_EVENT_WAIT,	// IO Control code
-					NULL,				// Input Buffer to driver.
-					0,					// Length of input buffer in bytes.
-					buffer,             // Output Buffer from driver.
-					sizeof(buffer),		// Length of output buffer in bytes.
-					&returnedLength,	// Bytes placed in buffer.
-					NULL                // synchronous call
-					);
+			device,				// Handle to device
+			IOCTL_EVENT_WAIT,	// IO Control code
+			NULL,				// Input Buffer to driver.
+			0,					// Length of input buffer in bytes.
+			buffer,             // Output Buffer from driver.
+			sizeof(buffer),		// Length of output buffer in bytes.
+			&returnedLength,	// Bytes placed in buffer.
+			NULL                // synchronous call
+			);
 
 		if (!status) {
 			DbgPrint("Ioctl failed with code %d\n", GetLastError());
@@ -313,7 +318,7 @@ DokanLoop(
 			PEVENT_CONTEXT context = (PEVENT_CONTEXT)buffer;
 			if (context->MountId != DokanInstance->MountId) {
 				DbgPrint("Dokan Error: Invalid MountId (expected:%d, acctual:%d)\n",
-						DokanInstance->MountId, context->MountId);
+					DokanInstance->MountId, context->MountId);
 				continue;
 			}
 
@@ -378,7 +383,7 @@ DokanLoop(
 
 
 VOID
-SendEventInformation(
+	SendEventInformation(
 	HANDLE				Handle,
 	PEVENT_INFORMATION	EventInfo,
 	ULONG				EventLength,
@@ -394,15 +399,15 @@ SendEventInformation(
 
 	// send event info to driver
 	status = DeviceIoControl(
-					Handle,				// Handle to device
-					IOCTL_EVENT_INFO,	// IO Control code
-					EventInfo,			// Input Buffer to driver.
-					EventLength,		// Length of input buffer in bytes.
-					NULL,				// Output Buffer from driver.
-					0,					// Length of output buffer in bytes.
-					&returnedLength,	// Bytes placed in buffer.
-					NULL				// synchronous call
-					);
+		Handle,				// Handle to device
+		IOCTL_EVENT_INFO,	// IO Control code
+		EventInfo,			// Input Buffer to driver.
+		EventLength,		// Length of input buffer in bytes.
+		NULL,				// Output Buffer from driver.
+		0,					// Length of output buffer in bytes.
+		&returnedLength,	// Bytes placed in buffer.
+		NULL				// synchronous call
+		);
 
 	if (!status) {
 		DWORD errorCode = GetLastError();
@@ -412,7 +417,7 @@ SendEventInformation(
 
 
 VOID
-CheckFileName(
+	CheckFileName(
 	LPWSTR	FileName)
 {
 	// if the begining of file name is "\\",
@@ -429,7 +434,7 @@ CheckFileName(
 
 
 PEVENT_INFORMATION
-DispatchCommon(
+	DispatchCommon(
 	PEVENT_CONTEXT		EventContext,
 	ULONG				SizeOfEventInfo,
 	PDOKAN_INSTANCE		DokanInstance,
@@ -479,7 +484,7 @@ DispatchCommon(
 
 
 PDOKAN_OPEN_INFO
-GetDokanOpenInfo(
+	GetDokanOpenInfo(
 	PEVENT_CONTEXT		EventContext,
 	PDOKAN_INSTANCE		DokanInstance)
 {
@@ -498,7 +503,7 @@ GetDokanOpenInfo(
 
 
 VOID
-ReleaseDokanOpenInfo(
+	ReleaseDokanOpenInfo(
 	PEVENT_INFORMATION	EventInformation,
 	PDOKAN_INSTANCE		DokanInstance)
 {
@@ -523,7 +528,7 @@ ReleaseDokanOpenInfo(
 
 
 VOID
-DispatchUnmount(
+	DispatchUnmount(
 	HANDLE				Handle,
 	PEVENT_CONTEXT		EventContext,
 	PDOKAN_INSTANCE		DokanInstance)
@@ -533,7 +538,7 @@ DispatchUnmount(
 
 	// Unmount is called only once
 	EnterCriticalSection(&DokanInstance->CriticalSection); 
-	
+
 	if (count > 0) {
 		LeaveCriticalSection(&DokanInstance->CriticalSection);
 		return;
@@ -558,7 +563,7 @@ DispatchUnmount(
 
 // ask driver to release all pending IRP to prepare for Unmount.
 BOOL
-SendReleaseIRP(
+	SendReleaseIRP(
 	LPCWSTR	DeviceName)
 {
 	ULONG	returnedLength;
@@ -566,16 +571,16 @@ SendReleaseIRP(
 	DbgPrint("send release\n");
 
 	if (!SendToDevice(
-				GetRawDeviceName(DeviceName),
-				IOCTL_EVENT_RELEASE,
-				NULL,
-				0,
-				NULL,
-				0,
-				&returnedLength) ) {
-		
-		DbgPrint("Failed to unmount device:%ws\n", DeviceName);
-		return FALSE;
+		GetRawDeviceName(DeviceName),
+		IOCTL_EVENT_RELEASE,
+		NULL,
+		0,
+		NULL,
+		0,
+		&returnedLength) ) {
+
+			DbgPrint("Failed to unmount device:%ws\n", DeviceName);
+			return FALSE;
 	}
 
 	return TRUE;
@@ -583,7 +588,7 @@ SendReleaseIRP(
 
 
 BOOL
-DokanStart(PDOKAN_INSTANCE Instance)
+	DokanStart(PDOKAN_INSTANCE Instance)
 {
 	EVENT_START			eventStart;
 	EVENT_DRIVER_INFO	driverInfo;
@@ -628,8 +633,8 @@ DokanStart(PDOKAN_INSTANCE Instance)
 		Instance->MountId = driverInfo.MountId;
 		Instance->DeviceNumber = driverInfo.DeviceNumber;
 		wcscpy_s(Instance->DeviceName,
-				sizeof(Instance->DeviceName) / sizeof(WCHAR),
-				driverInfo.DeviceName);
+			sizeof(Instance->DeviceName) / sizeof(WCHAR),
+			driverInfo.DeviceName);
 		return TRUE;
 	}
 	return FALSE;
@@ -637,7 +642,7 @@ DokanStart(PDOKAN_INSTANCE Instance)
 
 
 BOOL
-DokanSetDebugMode(
+	DokanSetDebugMode(
 	ULONG	Mode)
 {
 	ULONG returnedLength;
@@ -653,7 +658,7 @@ DokanSetDebugMode(
 
 
 BOOL
-SendToDevice(
+	SendToDevice(
 	LPCWSTR	DeviceName,
 	DWORD	IoControlCode,
 	PVOID	InputBuffer,
@@ -667,32 +672,32 @@ SendToDevice(
 	ULONG	returnedLength;
 
 	device = CreateFile(
-				DeviceName,							// lpFileName
-				GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
-                FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
-                NULL,                               // lpSecurityAttributes
-                OPEN_EXISTING,                      // dwCreationDistribution
-                0,                                  // dwFlagsAndAttributes
-                NULL                                // hTemplateFile
-			);
+		DeviceName,							// lpFileName
+		GENERIC_READ | GENERIC_WRITE,       // dwDesiredAccess
+		FILE_SHARE_READ | FILE_SHARE_WRITE, // dwShareMode
+		NULL,                               // lpSecurityAttributes
+		OPEN_EXISTING,                      // dwCreationDistribution
+		0,                                  // dwFlagsAndAttributes
+		NULL                                // hTemplateFile
+		);
 
-    if (device == INVALID_HANDLE_VALUE) {
+	if (device == INVALID_HANDLE_VALUE) {
 		DWORD dwErrorCode = GetLastError();
 		DbgPrint("Dokan Error: Failed to open %ws with code %d\n",
 			DeviceName, dwErrorCode);
-        return FALSE;
-    }
+		return FALSE;
+	}
 
 	status = DeviceIoControl(
-				device,                 // Handle to device
-				IoControlCode,			// IO Control code
-				InputBuffer,		    // Input Buffer to driver.
-				InputLength,			// Length of input buffer in bytes.
-				OutputBuffer,           // Output Buffer from driver.
-				OutputLength,			// Length of output buffer in bytes.
-				ReturnedLength,		    // Bytes placed in buffer.
-				NULL                    // synchronous call
-			);
+		device,                 // Handle to device
+		IoControlCode,			// IO Control code
+		InputBuffer,		    // Input Buffer to driver.
+		InputLength,			// Length of input buffer in bytes.
+		OutputBuffer,           // Output Buffer from driver.
+		OutputLength,			// Length of output buffer in bytes.
+		ReturnedLength,		    // Bytes placed in buffer.
+		NULL                    // synchronous call
+		);
 
 	CloseHandle(device);
 
@@ -711,35 +716,35 @@ BOOL WINAPI DllMain(
 	LPVOID		Reserved)
 {
 	switch(Reason) {
-		case DLL_PROCESS_ATTACH:
-			{
+	case DLL_PROCESS_ATTACH:
+		{
 #if _MSC_VER < 1300
-				InitializeCriticalSection(&g_InstanceCriticalSection);
+			InitializeCriticalSection(&g_InstanceCriticalSection);
 #else
-				InitializeCriticalSectionAndSpinCount(
-					&g_InstanceCriticalSection, 0x80000400);
+			InitializeCriticalSectionAndSpinCount(
+				&g_InstanceCriticalSection, 0x80000400);
 #endif
-				
-				InitializeListHead(&g_InstanceList);
-			}
-			break;			
-		case DLL_PROCESS_DETACH:
-			{
-				EnterCriticalSection(&g_InstanceCriticalSection);
 
-				while(!IsListEmpty(&g_InstanceList)) {
-					PLIST_ENTRY entry = RemoveHeadList(&g_InstanceList);
-					PDOKAN_INSTANCE instance =
-						CONTAINING_RECORD(entry, DOKAN_INSTANCE, ListEntry);
-					
-					DokanRemoveMountPoint(instance->MountPoint);
-					free(instance);
-				}
+			InitializeListHead(&g_InstanceList);
+		}
+		break;			
+	case DLL_PROCESS_DETACH:
+		{
+			EnterCriticalSection(&g_InstanceCriticalSection);
 
-				LeaveCriticalSection(&g_InstanceCriticalSection);
-				DeleteCriticalSection(&g_InstanceCriticalSection);
+			while(!IsListEmpty(&g_InstanceList)) {
+				PLIST_ENTRY entry = RemoveHeadList(&g_InstanceList);
+				PDOKAN_INSTANCE instance =
+					CONTAINING_RECORD(entry, DOKAN_INSTANCE, ListEntry);
+
+				DokanRemoveMountPoint(instance->MountPoint);
+				free(instance);
 			}
-			break;
+
+			LeaveCriticalSection(&g_InstanceCriticalSection);
+			DeleteCriticalSection(&g_InstanceCriticalSection);
+		}
+		break;
 	}
 	return TRUE;
 }

@@ -33,7 +33,8 @@ int ShowMountList()
 {
 	DOKAN_CONTROL control;
 	ULONG index = 0;
-	ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	//ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	DOKAN_CONTROL_INIT(control);
 
 	control.Type = DOKAN_CONTROL_LIST;
 	control.Option = 0;
@@ -77,7 +78,8 @@ int Unmount(LPCWSTR	MountPoint, BOOL ForceUnmount)
 {
 	int status = 0;
 	DOKAN_CONTROL control;
-	ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	//ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	DOKAN_CONTROL_INIT(control);
 
 	if (wcslen(MountPoint) == 1 && L'0' <= MountPoint[0] && MountPoint[0] <= L'9') {
 		control.Type = DOKAN_CONTROL_LIST;
@@ -140,7 +142,14 @@ wmain(int argc, PWCHAR argv[])
 	ZeroMemory(driverFullPath, sizeof(driverFullPath));
 	wcscpy_s(mounterFullPath, MAX_PATH, fileName);
 	mounterFullPath[i] = L'\\';
+
+#ifndef DOKAN_MOUNT_ORIG
+	wcscat_s(mounterFullPath, MAX_PATH, L"mountsvc.exe");
+#else
 	wcscat_s(mounterFullPath, MAX_PATH, L"mounter.exe");
+#endif
+
+	
 
 	GetSystemDirectory(driverFullPath, MAX_PATH);
 	wcscat_s(driverFullPath, MAX_PATH, L"\\drivers\\dokan.sys");

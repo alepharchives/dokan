@@ -1,9 +1,9 @@
 /*
-  Dokan : user-mode file system library for Windows
+Dokan : user-mode file system library for Windows
 
-  Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
+Copyright (C) 2008 Hiroki Asakawa info@dokan-dev.net
 
-  http://dokan-dev.net/en
+http://dokan-dev.net/en
 
 This program is free software; you can redistribute it and/or modify it under
 the terms of the GNU Lesser General Public License as published by the Free
@@ -22,9 +22,10 @@ with this program. If not, see <http://www.gnu.org/licenses/>.
 #include <windows.h>
 #include <stdio.h>
 #include "dokani.h"
+#include <ShlObj.h>
 
 static BOOL
-DokanServiceCheck(
+	DokanServiceCheck(
 	LPCWSTR	ServiceName)
 {
 	SC_HANDLE controlHandle;
@@ -45,7 +46,7 @@ DokanServiceCheck(
 		CloseServiceHandle(controlHandle);
 		return FALSE;
 	}
-	
+
 	CloseServiceHandle(serviceHandle);
 	CloseServiceHandle(controlHandle);
 
@@ -54,7 +55,7 @@ DokanServiceCheck(
 
 
 static BOOL
-DokanServiceControl(
+	DokanServiceControl(
 	LPCWSTR	ServiceName,
 	ULONG	Type)
 {
@@ -78,7 +79,7 @@ DokanServiceControl(
 		CloseServiceHandle(controlHandle);
 		return FALSE;
 	}
-	
+
 	QueryServiceStatus(serviceHandle, &ss);
 
 	if (Type == DOKAN_SERVICE_DELETE) {
@@ -98,7 +99,7 @@ DokanServiceControl(
 			DokanDbgPrintW(L"failed to start service (%s): %d\n", ServiceName, GetLastError());
 			result = FALSE;
 		}
-	
+
 	} else if (ss.dwCurrentState == SERVICE_RUNNING && Type == DOKAN_SERVICE_STOP) {
 
 		if (ControlService(serviceHandle, SERVICE_CONTROL_STOP, &ss)) {
@@ -120,7 +121,7 @@ DokanServiceControl(
 
 
 BOOL DOKANAPI
-DokanMountControl(PDOKAN_CONTROL Control)
+	DokanMountControl(PDOKAN_CONTROL Control)
 {
 	HANDLE pipe;
 	DWORD writtenBytes;
@@ -130,7 +131,7 @@ DokanMountControl(PDOKAN_CONTROL Control)
 
 	for (;;) {
 		pipe = CreateFile(DOKAN_CONTROL_PIPE,  GENERIC_READ|GENERIC_WRITE,
-						0, NULL, OPEN_EXISTING, 0, NULL);
+			0, NULL, OPEN_EXISTING, 0, NULL);
 		if (pipe != INVALID_HANDLE_VALUE) {
 			break;
 		}
@@ -162,7 +163,7 @@ DokanMountControl(PDOKAN_CONTROL Control)
 
 	if(!TransactNamedPipe(pipe, Control, sizeof(DOKAN_CONTROL),
 		Control, sizeof(DOKAN_CONTROL), &readBytes, NULL)) {
-		DbgPrint("failed to transact named pipe: %d\n", GetLastError());
+			DbgPrint("failed to transact named pipe: %d\n", GetLastError());
 	}
 
 	CloseHandle(pipe);
@@ -176,14 +177,14 @@ DokanMountControl(PDOKAN_CONTROL Control)
 
 
 BOOL DOKANAPI
-DokanServiceInstall(
+	DokanServiceInstall(
 	LPCWSTR	ServiceName,
 	DWORD	ServiceType,
 	LPCWSTR ServiceFullPath)
 {
 	SC_HANDLE	controlHandle;
 	SC_HANDLE	serviceHandle;
-	
+
 	controlHandle = OpenSCManager(NULL, NULL, SC_MANAGER_CREATE_SERVICE);
 	if (controlHandle == NULL) {
 		DokanDbgPrint("failed to open SCM");
@@ -193,7 +194,7 @@ DokanServiceInstall(
 	serviceHandle = CreateService(controlHandle, ServiceName, ServiceName, 0,
 		ServiceType, SERVICE_AUTO_START, SERVICE_ERROR_IGNORE,
 		ServiceFullPath, NULL, NULL, NULL, NULL, NULL);
-	
+
 	if (serviceHandle == NULL) {
 		if (GetLastError() == ERROR_SERVICE_EXISTS) {
 			DokanDbgPrintW(L"Service (%s) is already installed\n", ServiceName);
@@ -203,7 +204,7 @@ DokanServiceInstall(
 		CloseServiceHandle(controlHandle);
 		return FALSE;
 	}
-	
+
 	CloseServiceHandle(serviceHandle);
 	CloseServiceHandle(controlHandle);
 
@@ -220,7 +221,7 @@ DokanServiceInstall(
 
 
 BOOL DOKANAPI
-DokanServiceDelete(
+	DokanServiceDelete(
 	LPCWSTR	ServiceName)
 {
 	if (DokanServiceCheck(ServiceName)) {
@@ -235,8 +236,9 @@ DokanServiceDelete(
 }
 
 
+
 BOOL DOKANAPI
-DokanUnmount(
+	DokanUnmount(
 	WCHAR	DriveLetter)
 {
 	WCHAR mountPoint[] = L"M:\\";
@@ -246,13 +248,16 @@ DokanUnmount(
 
 
 BOOL DOKANAPI
-DokanRemoveMountPoint(
+	DokanRemoveMountPoint(
 	LPCWSTR MountPoint)
 {
 	DOKAN_CONTROL control;
 	BOOL result;
 
-	ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+	//ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+
+	DOKAN_CONTROL_INIT(control);
+
 	control.Type = DOKAN_CONTROL_UNMOUNT;
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 
@@ -261,7 +266,11 @@ DokanRemoveMountPoint(
 	result = DokanMountControl(&control);
 	if (result) {
 		DbgPrint("DokanControl recieved DeviceName:%ws\n", control.DeviceName);
+
+		SHChangeNotify(SHCNE_DRIVEREMOVED ,SHCNF_PATH|SHCNF_FLUSHNOWAIT,MountPoint,NULL);
+
 		SendReleaseIRP(control.DeviceName);
+
 	} else {
 		DbgPrint("DokanRemoveMountPoint failed\n");
 	}
@@ -269,20 +278,37 @@ DokanRemoveMountPoint(
 }
 
 
+
 BOOL
-DokanMount(
+	DokanMount(
 	LPCWSTR	MountPoint,
-	LPCWSTR	DeviceName)
+	LPCWSTR	DeviceName,ULONG Options)
 {
 	DOKAN_CONTROL control;
+	BOOL result;
 
-	ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+
+	//ZeroMemory(&control, sizeof(DOKAN_CONTROL));
+
+	DOKAN_CONTROL_INIT(control);
+
 	control.Type = DOKAN_CONTROL_MOUNT;
+
+	if(Options & DOKAN_OPTION_LOCAL){
+		control.Option |= DOKAN_CONTROL_OPTION_LOCAL_CONTEXT;
+	}
 
 	wcscpy_s(control.MountPoint, sizeof(control.MountPoint) / sizeof(WCHAR), MountPoint);
 	wcscpy_s(control.DeviceName, sizeof(control.DeviceName) / sizeof(WCHAR), DeviceName);
 
-	return  DokanMountControl(&control);
+	result = DokanMountControl(&control);
+
+	if(result){
+
+		SHChangeNotify(SHCNE_DRIVEADD ,SHCNF_PATH|SHCNF_FLUSHNOWAIT,MountPoint,NULL);
+	}
+
+	return result;
 }
 
 
@@ -293,7 +319,7 @@ DokanMount(
 #define DOKAN_NP_ORDER_KEY		L"System\\CurrentControlSet\\Control\\NetworkProvider\\Order"
 
 BOOL DOKANAPI
-DokanNetworkProviderInstall()
+	DokanNetworkProviderInstall()
 {
 	HKEY key;
 	DWORD position;
@@ -314,7 +340,7 @@ DokanNetworkProviderInstall()
 	RegSetValueEx(key, L"ProviderPath", 0, REG_SZ,
 		(BYTE*)DOKAN_NP_PATH, (wcslen(DOKAN_NP_PATH)+1) * sizeof(WCHAR));
 
-    RegCloseKey(key);
+	RegCloseKey(key);
 
 	RegOpenKeyEx(HKEY_LOCAL_MACHINE, DOKAN_NP_ORDER_KEY, 0, KEY_ALL_ACCESS, &key);
 
@@ -326,13 +352,13 @@ DokanNetworkProviderInstall()
 			(BYTE*)&buffer, (wcslen(buffer) + 1) * sizeof(WCHAR));
 	}
 
-    RegCloseKey(key);
+	RegCloseKey(key);
 	return TRUE;
 }
 
 
 BOOL DOKANAPI
-DokanNetworkProviderUninstall()
+	DokanNetworkProviderUninstall()
 {
 	HKEY key;
 	DWORD type;
@@ -346,7 +372,7 @@ DokanNetworkProviderUninstall()
 	RegOpenKeyEx(HKEY_LOCAL_MACHINE, DOKAN_NP_SERVICE_KEY, 0, KEY_ALL_ACCESS, &key);
 	RegDeleteKey(key, L"NetworkProvider");
 
-    RegCloseKey(key);
+	RegCloseKey(key);
 
 	RegOpenKeyEx(HKEY_LOCAL_MACHINE, DOKAN_NP_ORDER_KEY, 0, KEY_ALL_ACCESS, &key);
 
@@ -360,7 +386,7 @@ DokanNetworkProviderUninstall()
 			(BYTE*)&buffer2, (wcslen(buffer2) + 1) * sizeof(WCHAR));
 	}
 
-    RegCloseKey(key);
+	RegCloseKey(key);
 
 	return TRUE;
 }

@@ -1,0 +1,16 @@
+
+
+AMD64_OBJECTS=\
+ $(OBJ_PATH)\$O\dokanctl.obj \
+
+
+
+
+
+# lowercased
+BASEDIR=g:\winddk\7600.16385.1
+OBJECT_ROOT=g:\winddk\7600.16385.1
+MAKEDIR_LOWERCASE=g:\dokan-fork\dokan_control
+OBJ_PATH=g:\dokan-fork\dokan_control
+CONCURRENT_MIDL=0
+CONCURRENT_MANIFEST_BUILD=0

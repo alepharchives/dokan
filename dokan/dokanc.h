@@ -31,10 +31,23 @@ extern "C" {
 #define DOKAN_MOUNT_POINT_SUPPORTED_VERSION 600
 #define DOKAN_SECURITY_SUPPORTED_VERSION	600
 
-#define DOKAN_GLOBAL_DEVICE_NAME	L"\\\\.\\Dokan"
-#define DOKAN_CONTROL_PIPE			L"\\\\.\\pipe\\DokanMounter"
+#define DOKAN_MOUNT_CALLBACK_SUPPORTED_VERSION 601
 
+#define DOKAN_GLOBAL_DEVICE_NAME	L"\\\\.\\Dokan"
+
+
+#ifndef DOKAN_MOUNT_ORIG
+
+#define DOKAN_CONTROL_PIPE			L"\\\\.\\pipe\\DokanMountSvc"
+#define DOKAN_MOUNTER_SERVICE L"DokanMountSvc"
+
+#else
+
+#define DOKAN_CONTROL_PIPE			L"\\\\.\\pipe\\DokanMounter"
 #define DOKAN_MOUNTER_SERVICE L"DokanMounter"
+
+#endif
+
 #define DOKAN_DRIVER_SERVICE L"Dokan"
 
 #define DOKAN_CONTROL_MOUNT		1
@@ -44,6 +57,8 @@ extern "C" {
 #define DOKAN_CONTROL_LIST		5
 
 #define DOKAN_CONTROL_OPTION_FORCE_UNMOUNT 1
+
+#define DOKAN_CONTROL_OPTION_LOCAL_CONTEXT 1024
 
 #define DOKAN_CONTROL_SUCCESS	1
 #define DOKAN_CONTROL_FAIL		0
@@ -68,8 +83,15 @@ typedef struct _DOKAN_CONTROL {
 	WCHAR	DeviceName[64];
 	ULONG	Option;
 	ULONG	Status;
+	DWORD   SessionId;
 
 } DOKAN_CONTROL, *PDOKAN_CONTROL;
+
+#define DOKAN_CONTROL_INIT(c) \
+	do {\
+		ZeroMemory(&c, sizeof(DOKAN_CONTROL));\
+		ProcessIdToSessionId(GetCurrentProcessId(),&c.SessionId);\
+	} while(0)
 
 
 static
